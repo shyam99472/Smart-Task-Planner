@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Task Planner - AI Project</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🧠 Smart Task Planner</h1>
+        <p>Enter your goal and let AI generate an actionable plan with dependencies and deadlines.</p>
+    </header>
+
+    <main>
+        <div class="input-section">
+            <textarea id="goalInput" placeholder="e.g., Launch a product in 2 weeks" rows="3"></textarea>
+            <button id="generateButton">Generate Plan</button>
+        </div>
+
+        <div id="loading" class="hidden">Generating plan... Please wait, this may take a moment.</div>
+        
+        <div id="resultContainer" class="hidden">
+            <h2>Generated Plan</h2>
+            <div id="taskList">
+                </div>
+        </div>
+        
+        <div id="errorDisplay" class="hidden error-message"></div>
+
+    </main>
+
+    <script>
+        document.getElementById('generateButton').addEventListener('click', generatePlan);
+
+        // Function to start the planning process
+        async function generatePlan() {
+            const goal = document.getElementById('goalInput').value.trim();
+            const resultContainer = document.getElementById('resultContainer');
+            const taskList = document.getElementById('taskList');
+            const loading = document.getElementById('loading');
+            const errorDisplay = document.getElementById('errorDisplay');
+
+            // 1. Reset UI and validate input
+            taskList.innerHTML = '';
+            resultContainer.classList.add('hidden');
+            errorDisplay.classList.add('hidden');
+            if (!goal) {
+                errorDisplay.textContent = "Please enter a goal before generating a plan.";
+                errorDisplay.classList.remove('hidden');
+                return;
+            }
+            loading.classList.remove('hidden');
+
+            try {
+                // 2. Call your Backend API using the browser's Fetch API
+                const response = await fetch('http://127.0.0.1:5000/api/plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ goal: goal })
+                });
+
+                const data = await response.json();
+
+                // 3. Process the response
+                if (!response.ok || data.error) {
+                    // Check for HTTP errors or error message in the JSON payload
+                    throw new Error(data.error || `Server responded with status: ${response.status}`);
+                }
+
+                // 4. Render the structured task list
+                if (data.tasks && Array.isArray(data.tasks)) {
+                    data.tasks.forEach(task => {
+                        const taskElement = document.createElement('div');
+                        taskElement.className = 'task-item';
+                        
+                        // Format dependencies clearly
+                        const dependenciesText = task.dependencies && task.dependencies.length > 0 
+                            ? `(Depends on: ${task.dependencies.join(', ')})`
+                            : '(No Dependencies)';
+
+                        // Display the core output: task, duration, deadline, dependencies
+                        taskElement.innerHTML = `
+                            <h3>${task.task}</h3>
+                            <p><strong>Duration:</strong> ${task.duration_days} days</p>
+                            <p><strong>Deadline:</strong> Day ${task.deadline_days}</p>
+                            <p class="dependencies">${dependenciesText}</p>
+                        `;
+                        taskList.appendChild(taskElement);
+                    });
+                } else {
+                     throw new Error("AI returned a plan in an unexpected format.");
+                }
+
+                resultContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error:', error);
+                errorDisplay.textContent = `Error: ${error.message}. Check your API key or server status.`;
+                errorDisplay.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
